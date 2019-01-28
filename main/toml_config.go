@@ -7,7 +7,7 @@ import (
     "sync"
 )
 
-// CMD: go run config.go {a config file name without an extension}
+// CMD: go run toml_config.go {a config file name without an extension}
 func main() {
     initEnv()
     url := Get().URL

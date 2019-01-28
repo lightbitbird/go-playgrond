@@ -18,7 +18,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
     rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "debug enable flag")
-    subCmd.PersistentFlags().String("name", "Tom", "sub command string flag test")
+    subCmd.PersistentFlags().StringP("name", "n", "Tom", "sub command string flag test")
     rootCmd.AddCommand(subCmd)
 }
 

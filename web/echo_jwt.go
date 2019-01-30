@@ -1,13 +1,17 @@
 package main
 
 import (
-"net/http"
-"time"
+    "net/http"
+    "runtime"
+    "time"
 
-"github.com/dgrijalva/jwt-go"
-"github.com/labstack/echo"
-"github.com/labstack/echo/middleware"
+    "github.com/dgrijalva/jwt-go"
+    "github.com/labstack/echo"
+    "github.com/labstack/echo/middleware"
+    "github.com/labstack/gommon/log"
 )
+
+var eLog echo.Logger
 
 // jwtCustomClaims are custom claims extending default ones.
 type jwtCustomClaims struct {
@@ -48,6 +52,15 @@ func jwt_login(c echo.Context) error {
 }
 
 func accessible(c echo.Context) error {
+    var jsn log.JSON
+    jsn = make(log.JSON)
+    jsn["message"] = "log test"
+    if pc, file, line, ok := runtime.Caller(1); ok {
+        jsn["pc"] = pc
+        jsn["last_file"] = file
+        jsn["last_row"] = line
+    }
+    eLog.Debugj(jsn)
     return c.String(http.StatusOK, "Accessible")
 }
 
@@ -60,6 +73,8 @@ func restricted(c echo.Context) error {
 
 func main() {
     e := echo.New()
+    eLog = e.Logger
+    eLog.SetLevel(log.DEBUG)
 
     // Middleware
     e.Use(middleware.Logger())

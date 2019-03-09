@@ -1,15 +1,47 @@
 package main
 
 import (
+    "fmt"
+    "github.com/labstack/echo/middleware"
+    "io/ioutil"
     "net/http"
+    "os"
     "runtime"
     "time"
 
     "github.com/dgrijalva/jwt-go"
     "github.com/labstack/echo"
-    "github.com/labstack/echo/middleware"
     "github.com/labstack/gommon/log"
 )
+
+func main() {
+    e := echo.New()
+    eLog = e.Logger
+    eLog.SetLevel(log.DEBUG)
+
+    // Middleware
+    e.Use(middleware.Logger())
+    e.Use(middleware.Recover())
+
+    // Login route
+    e.POST("/login", jwt_login)
+
+    // Unauthenticated route
+    e.GET("/", accessible)
+
+    // Restricted group
+    r := e.Group("/restricted")
+
+    // Configure middleware with the custom claims type
+    config := middleware.JWTConfig{
+        Claims:     &jwtCustomClaims{},
+        SigningKey: []byte("secret"),
+    }
+    r.Use(middleware.JWTWithConfig(config))
+    r.GET("", restricted)
+
+    e.Logger.Fatal(e.Start(":1323"))
+}
 
 var eLog echo.Logger
 
@@ -35,8 +67,27 @@ func jwt_login(c echo.Context) error {
             },
         }
 
+        if files, err := ioutil.ReadDir("./logs"); err != nil {
+            fmt.Println("an error occured: ", err)
+        } else {
+            go func() {
+                fmt.Println(" go rutineeeee ")
+                for _, file := range files {
+                    maxAge := time.Now().AddDate(0, 0, -10)
+                    // fmt.Println("file", file.Name(), maxAge, time.Now())
+                    if maxAge.After(file.ModTime()) {
+                        fmt.Println("file", file.Name(), maxAge, file.ModTime())
+                        os.Remove(fmt.Sprintf("./logs/%s", file.Name()))
+                    }
+                }
+
+            }()
+        }
+
         // Create token with claims
         token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+        time.Sleep(1000 * time.Millisecond)
 
         // Generate encoded token and send it as response.
         t, err := token.SignedString([]byte("secret"))
@@ -71,31 +122,3 @@ func restricted(c echo.Context) error {
     return c.String(http.StatusOK, "Welcome "+name+"!")
 }
 
-func main() {
-    e := echo.New()
-    eLog = e.Logger
-    eLog.SetLevel(log.DEBUG)
-
-    // Middleware
-    e.Use(middleware.Logger())
-    e.Use(middleware.Recover())
-
-    // Login route
-    e.POST("/login", jwt_login)
-
-    // Unauthenticated route
-    e.GET("/", accessible)
-
-    // Restricted group
-    r := e.Group("/restricted")
-
-    // Configure middleware with the custom claims type
-    config := middleware.JWTConfig{
-        Claims:     &jwtCustomClaims{},
-        SigningKey: []byte("secret"),
-    }
-    r.Use(middleware.JWTWithConfig(config))
-    r.GET("", restricted)
-
-    e.Logger.Fatal(e.Start(":1323"))
-}

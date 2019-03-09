@@ -19,7 +19,7 @@ func main() {
 }
 
 func Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-    fmt.Fprint(w, "welcom!\n")
+    fmt.Fprint(w, "welcome!\n")
 }
 
 func Hello2(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

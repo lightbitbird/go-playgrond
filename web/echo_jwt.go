@@ -19,6 +19,9 @@ func main() {
     eLog = e.Logger
     eLog.SetLevel(log.DEBUG)
 
+    rotation = logRotation{complete: true}
+    // rotation.lastTime = time.Date(2019, 3, 10, 0, 0, 0, 0, time.Local)
+
     // Middleware
     e.Use(middleware.Logger())
     e.Use(middleware.Recover())
@@ -44,6 +47,7 @@ func main() {
 }
 
 var eLog echo.Logger
+var rotation logRotation
 
 // jwtCustomClaims are custom claims extending default ones.
 type jwtCustomClaims struct {
@@ -52,9 +56,17 @@ type jwtCustomClaims struct {
     jwt.StandardClaims
 }
 
+type logRotation struct {
+    lastTime time.Time
+    complete bool
+}
+
 func jwt_login(c echo.Context) error {
     username := c.FormValue("username")
     password := c.FormValue("password")
+
+    // 期間以前のログファイル削除
+    removeLogFiles(&rotation)
 
     if username == "jon" && password == "shhh!" {
 
@@ -65,23 +77,6 @@ func jwt_login(c echo.Context) error {
             jwt.StandardClaims{
                 ExpiresAt: time.Now().Add(time.Hour * 72).Unix(),
             },
-        }
-
-        if files, err := ioutil.ReadDir("./logs"); err != nil {
-            fmt.Println("an error occured: ", err)
-        } else {
-            go func() {
-                fmt.Println(" go rutineeeee ")
-                for _, file := range files {
-                    maxAge := time.Now().AddDate(0, 0, -10)
-                    // fmt.Println("file", file.Name(), maxAge, time.Now())
-                    if maxAge.After(file.ModTime()) {
-                        fmt.Println("file", file.Name(), maxAge, file.ModTime())
-                        os.Remove(fmt.Sprintf("./logs/%s", file.Name()))
-                    }
-                }
-
-            }()
         }
 
         // Create token with claims
@@ -100,6 +95,58 @@ func jwt_login(c echo.Context) error {
     }
 
     return echo.ErrUnauthorized
+}
+
+func removeLogFiles(rotation *logRotation) {
+    go func() {
+
+        fmt.Println("LogRotation = ", rotation.lastTime, rotation.complete)
+        today, _ := midnightTime(time.Now())
+
+        fmt.Println("today = ", *today, today)
+        if rotation.lastTime.IsZero() || rotation.lastTime.Before(*today) {
+            fmt.Println("lastTime = ", rotation.lastTime, rotation.lastTime.Before(*today))
+            rotation.complete = false
+        }
+        if !rotation.complete {
+            if files, err := ioutil.ReadDir("./logs"); err == nil {
+                if files == nil || len(files) == 0 {
+                    rotation.lastTime = *today
+                    rotation.complete = true
+                }
+                var i = 0
+                maxAge := today.AddDate(0, 0, -10)
+                var isCompleted = true
+                for _, file := range files {
+                    t := file.ModTime()
+                    mt := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
+                    // mt := time.Date(t.Year(), t.Month(), t.Day() - i, 0, 0, 0, 0, time.Local)
+                    fmt.Println("mt = ", file.ModTime(), mt, maxAge)
+                    if maxAge.After(mt) {
+                        fmt.Println("file", file.Name(), maxAge, mt)
+                        if err := os.Remove(fmt.Sprintf("./logs/%s", file.Name())); err != nil {
+                            fmt.Println("Error occured")
+                            isCompleted = false
+                        } else {
+                            fmt.Println("file.ModTime = ", file.ModTime())
+                        }
+                    }
+                    i++
+                }
+                if isCompleted {
+                    rotation.lastTime = *today
+                    rotation.complete = true
+                    fmt.Println("complete!!", rotation.lastTime, rotation.complete)
+                }
+            }
+        }
+
+    }()
+}
+
+func midnightTime(target time.Time) (*time.Time, error) {
+    midnight := time.Date(target.Year(), target.Month(), target.Day(), 0, 0, 0, 0, time.Local)
+    return &midnight, nil
 }
 
 func accessible(c echo.Context) error {
@@ -121,4 +168,3 @@ func restricted(c echo.Context) error {
     name := claims.Name
     return c.String(http.StatusOK, "Welcome "+name+"!")
 }
-
